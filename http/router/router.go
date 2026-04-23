@@ -31,6 +31,6 @@ func WebInit(g *gin.Engine) {
 		g.HEAD("/webclient2/*filepath", webclient2Handler)
 	}
 
-	// Serve web2.1 Umi admin console (replaces the previously missing /resources/admin).
-	g.StaticFS("/_admin", http.Dir(global.Config.Gin.ResourcesPath+"/web2.1"))
+	// Serve the Vue/Element Plus admin console at /_admin.
+	g.StaticFS("/_admin", http.Dir(global.Config.Gin.ResourcesPath+"/admin"))
 }

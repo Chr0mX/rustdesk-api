@@ -52,6 +52,7 @@ func Init(g *gin.Engine) {
 	RustdeskCmdBind(adg)
 	DeviceGroupBind(adg)
 	AdminActionLogBind(adg)
+	KeypairBind(adg)
 	//访问静态文件
 	//g.StaticFS("/upload", http.Dir(global.Config.Gin.ResourcesPath+"/upload"))
 }
@@ -128,6 +129,14 @@ func AdminActionLogBind(rg *gin.RouterGroup) {
 		aR.POST("/delete", cont.Delete)
 		aR.POST("/batchDelete", cont.BatchDelete)
 	}
+}
+
+func KeypairBind(rg *gin.RouterGroup) {
+	aR := rg.Group("/keypair").Use(middleware.AdminPrivilege())
+	cont := &admin.Keypair{}
+	aR.GET("", cont.Get)
+	aR.POST("", cont.Reset)
+	aR.PUT("", cont.Update)
 }
 
 func TagBind(rg *gin.RouterGroup) {

@@ -26,6 +26,7 @@ func Init(g *gin.Engine) {
 	ConfigBind(adg)
 
 	adg.Use(middleware.BackendUserAuth())
+	adg.Use(middleware.AdminActionLog())
 	//FileBind(adg)
 	UserBind(adg)
 	GroupBind(adg)
@@ -50,6 +51,7 @@ func Init(g *gin.Engine) {
 
 	RustdeskCmdBind(adg)
 	DeviceGroupBind(adg)
+	AdminActionLogBind(adg)
 	//访问静态文件
 	//g.StaticFS("/upload", http.Dir(global.Config.Gin.ResourcesPath+"/upload"))
 }
@@ -115,6 +117,16 @@ func DeviceGroupBind(rg *gin.RouterGroup) {
 		aR.POST("/create", cont.Create)
 		aR.POST("/update", cont.Update)
 		aR.POST("/delete", cont.Delete)
+	}
+}
+
+func AdminActionLogBind(rg *gin.RouterGroup) {
+	aR := rg.Group("/admin_action_log").Use(middleware.AdminPrivilege())
+	{
+		cont := &admin.AdminActionLog{}
+		aR.GET("/list", cont.List)
+		aR.POST("/delete", cont.Delete)
+		aR.POST("/batchDelete", cont.BatchDelete)
 	}
 }
 

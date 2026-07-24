@@ -33,6 +33,7 @@ func (co *Config) ServerConfig(c *gin.Context) {
 		ApiServer:                   global.Config.Rustdesk.ApiServer,
 		WebclientIdServer:           global.Config.Rustdesk.WebclientIdServer,
 		WebclientRelayServer:        global.Config.Rustdesk.WebclientRelayServer,
+		WebclientApiServer:          global.Config.Rustdesk.WebclientApiServer,
 		WebclientRelayFromApiServer: global.Config.Rustdesk.WebclientRelayFromApiServer,
 	}
 	response.Success(c, cf)
@@ -91,12 +92,12 @@ func (co *Config) WebclientBridge(c *gin.Context) {
 }
 
 // UpdateWebclientConfig forces (or, given blank values, un-forces) the
-// id-server/relay-server the bundled webclient is handed via
+// id-server/relay-server/api-server the bundled webclient is handed via
 // web.Index.ConfigJs, independent of what native clients get. Persisted to
 // the config file so it survives a restart.
 // @Tags ADMIN
-// @Summary 强制设置webclient的ID/中转服务器
-// @Description 强制设置webclient的ID/中转服务器,留空则不覆盖
+// @Summary 强制设置webclient的ID/中转/API服务器
+// @Description 强制设置webclient的ID/中转/API服务器,留空则不覆盖
 // @Accept  json
 // @Produce  json
 // @Param body body admin.WebclientConfigForm true "webclient配置"
@@ -113,9 +114,11 @@ func (co *Config) UpdateWebclientConfig(c *gin.Context) {
 
 	global.Config.Rustdesk.WebclientIdServer = f.WebclientIdServer
 	global.Config.Rustdesk.WebclientRelayServer = f.WebclientRelayServer
+	global.Config.Rustdesk.WebclientApiServer = f.WebclientApiServer
 	global.Config.Rustdesk.WebclientRelayFromApiServer = f.WebclientRelayFromApiServer
 	global.Viper.Set("rustdesk.webclient-id-server", f.WebclientIdServer)
 	global.Viper.Set("rustdesk.webclient-relay-server", f.WebclientRelayServer)
+	global.Viper.Set("rustdesk.webclient-api-server", f.WebclientApiServer)
 	global.Viper.Set("rustdesk.webclient-relay-from-api-server", f.WebclientRelayFromApiServer)
 	if err := global.Viper.WriteConfig(); err != nil {
 		response.Fail(c, 101, response.TranslateMsg(c, "OperationFailed")+err.Error())

@@ -55,6 +55,7 @@ type ServerConfigResponse struct {
 	ApiServer                   string `json:"api_server"`
 	WebclientIdServer           string `json:"webclient_id_server"`
 	WebclientRelayServer        string `json:"webclient_relay_server"`
+	WebclientApiServer          string `json:"webclient_api_server"`
 	WebclientRelayFromApiServer bool   `json:"webclient_relay_from_api_server"`
 }
 

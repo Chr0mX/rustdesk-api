@@ -24,12 +24,14 @@ type Rustdesk struct {
 	//webclient-magic-queryonline
 	WebclientMagicQueryonline int    `mapstructure:"webclient-magic-queryonline"`
 	WsHost                    string `mapstructure:"ws-host"`
-	// WebclientIdServer/WebclientRelayServer force-override the id-server/
-	// relay-server handed to the bundled webclient specifically (admin
-	// editable at runtime, see Config.UpdateWebclientConfig), independent of
-	// what native clients get from IdServer/RelayServer above.
+	// WebclientIdServer/WebclientRelayServer/WebclientApiServer force-override
+	// the id-server/relay-server/api-server handed to the bundled webclient
+	// specifically (admin editable at runtime, see
+	// Config.UpdateWebclientConfig), independent of what native clients get
+	// from IdServer/RelayServer/ApiServer above.
 	WebclientIdServer    string `mapstructure:"webclient-id-server"`
 	WebclientRelayServer string `mapstructure:"webclient-relay-server"`
+	WebclientApiServer   string `mapstructure:"webclient-api-server"`
 	// WebclientRelayFromApiServer: when true and WebclientRelayServer isn't
 	// set, derive the webclient's relay-server host from ApiServer instead
 	// of using RelayServer's host verbatim (keeping RelayServer's port, or
@@ -50,17 +52,26 @@ func (rd *Rustdesk) EffectiveWebclientIdServer() string {
 	return rd.IdServer
 }
 
+// EffectiveWebclientApiServer returns the api-server the bundled webclient
+// should use: the forced override if one is set, else the regular api-server.
+func (rd *Rustdesk) EffectiveWebclientApiServer() string {
+	if rd.WebclientApiServer != "" {
+		return rd.WebclientApiServer
+	}
+	return rd.ApiServer
+}
+
 // EffectiveWebclientRelayServer returns the relay-server the bundled
 // webclient should use: the forced override if one is set; else, if
-// WebclientRelayFromApiServer is on, api-server's host paired with
-// relay-server's port (falling back to RelayServer verbatim if api-server
-// can't be parsed); else the regular relay-server.
+// WebclientRelayFromApiServer is on, the effective webclient api-server's
+// host paired with relay-server's port (falling back to RelayServer
+// verbatim if that can't be parsed); else the regular relay-server.
 func (rd *Rustdesk) EffectiveWebclientRelayServer() string {
 	if rd.WebclientRelayServer != "" {
 		return rd.WebclientRelayServer
 	}
 	if rd.WebclientRelayFromApiServer {
-		if host := hostFromApiServer(rd.ApiServer); host != "" {
+		if host := hostFromApiServer(rd.EffectiveWebclientApiServer()); host != "" {
 			return host + ":" + portOrDefault(rd.RelayServer, DefaultRelayServerPort)
 		}
 	}

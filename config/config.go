@@ -23,6 +23,15 @@ type App struct {
 	DisablePwdLogin  bool          `mapstructure:"disable-pwd-login"`
 	CaptchaThreshold int           `mapstructure:"captcha-threshold"`
 	BanThreshold     int           `mapstructure:"ban-threshold"`
+	// WebclientCookieDomain sets the Domain attribute on the webclient auth
+	// session cookie (middleware.WebclientAuth). Leave blank for the
+	// default host-only cookie (fine when the admin console and webclient
+	// are served from the same host). Set it to a shared parent domain,
+	// e.g. ".example.com", when they're reverse-proxied under different
+	// subdomains of the same domain, so a session established on one is
+	// recognized on the other. Two different, unrelated domains can never
+	// share a cookie this way - that needs an actual SSO handoff.
+	WebclientCookieDomain string `mapstructure:"webclient-cookie-domain"`
 }
 type Admin struct {
 	Title           string `mapstructure:"title"`

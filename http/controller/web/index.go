@@ -28,6 +28,13 @@ func (i *Index) Index(c *gin.Context) {
 // URL, logged in or not, which is enough to abuse the rendezvous/relay
 // server or impersonate it.
 func (i *Index) ConfigJs(c *gin.Context) {
+	// This has to be revalidated on every load: it reflects whatever the
+	// admin most recently set (id-server/relay-server, or the webclient
+	// override), and it's also the one place that decides whether *this*
+	// visitor is authed right now. A cached response would keep serving
+	// stale values/an old auth decision after either changes.
+	c.Header("Cache-Control", "no-store, must-revalidate")
+
 	authed, _ := c.Get(middleware.WebclientAuthedKey)
 	if authed != true {
 		c.Header("Content-Type", "application/javascript")

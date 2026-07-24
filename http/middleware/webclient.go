@@ -34,15 +34,21 @@ const webclientSessionTTL = 6 * 3600 // 6h, in seconds (matches cache.Handler.Se
 // side (global.Cache) and drops it in an httpOnly cookie so the *next*
 // request (e.g. the browser's automatic GET of /webclient-config/index.js
 // right after loading /webclient/) is recognized too, without needing the
-// query param again.
+// query param again. When the ?token= path is what authed the visitor, that
+// same token rides along in the cached session (see LookupWebclientSessionToken)
+// so admin.Config.WebclientBridge can later hand it back to _admin - the
+// share_token path carries no such token, since it isn't tied to any admin
+// account.
 func WebclientAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authed := false
+		adminToken := ""
 
 		if sid, err := c.Cookie(webclientSessionCookie); err == nil && sid != "" {
-			var ok bool
-			if err := global.Cache.Get(webclientSessionCachePrefix+sid, &ok); err == nil && ok {
+			var cachedToken string
+			if err := global.Cache.Get(webclientSessionCachePrefix+sid, &cachedToken); err == nil {
 				authed = true
+				adminToken = cachedToken
 			}
 		}
 
@@ -51,6 +57,7 @@ func WebclientAuth() gin.HandlerFunc {
 				user, _ := service.AllService.UserService.InfoByAccessToken(token)
 				if user.Id != 0 && service.AllService.UserService.CheckUserEnable(user) {
 					authed = true
+					adminToken = token
 				}
 			}
 		}
@@ -65,7 +72,7 @@ func WebclientAuth() gin.HandlerFunc {
 		}
 
 		if authed {
-			EstablishWebclientSession(c)
+			EstablishWebclientSession(c, adminToken)
 		}
 
 		c.Set(WebclientAuthedKey, authed)
@@ -74,18 +81,36 @@ func WebclientAuth() gin.HandlerFunc {
 }
 
 // EstablishWebclientSession mints a short-lived opaque session id, stores it
-// server side (global.Cache) and drops it in an httpOnly cookie, same as
-// WebclientAuth does on a successful ?token=/?share_token= check. Exported
-// so an already-authenticated admin request (see
-// admin.Config.WebclientSession) can proactively establish the same
-// session - useful when the admin console and webclient are reverse-proxied
-// under different subdomains (see App.WebclientCookieDomain): the admin
-// console can call this right after login so the webclient recognizes the
-// visitor without needing a ?token= in the URL.
-func EstablishWebclientSession(c *gin.Context) {
+// server side (global.Cache, alongside adminToken - pass "" if this session
+// isn't tied to an admin api-token, e.g. a share_token-derived one) and
+// drops it in an httpOnly cookie, same as WebclientAuth does on a
+// successful ?token=/?share_token= check. Exported so an
+// already-authenticated admin request (see admin.Config.WebclientSession)
+// can proactively establish the same session - useful when the admin
+// console and webclient are reverse-proxied under different subdomains
+// (see App.WebclientCookieDomain): the admin console can call this right
+// after login so the webclient recognizes the visitor without needing a
+// ?token= in the URL.
+func EstablishWebclientSession(c *gin.Context, adminToken string) {
 	sid := utils.RandomString(32)
-	_ = global.Cache.Set(webclientSessionCachePrefix+sid, true, webclientSessionTTL)
+	_ = global.Cache.Set(webclientSessionCachePrefix+sid, adminToken, webclientSessionTTL)
 	secure := c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https"
 	c.SetSameSite(http.SameSiteLaxMode)
 	c.SetCookie(webclientSessionCookie, sid, webclientSessionTTL, "/", global.Config.App.WebclientCookieDomain, secure, true)
+}
+
+// LookupWebclientSessionToken returns the admin api-token tied to the
+// visitor's webclient session cookie, for admin.Config.WebclientBridge to
+// bounce them straight into _admin. ok is false when there's no valid
+// session at all; token is "" (with ok true) when the session exists but
+// isn't tied to any admin account (established via share_token).
+func LookupWebclientSessionToken(c *gin.Context) (token string, ok bool) {
+	sid, err := c.Cookie(webclientSessionCookie)
+	if err != nil || sid == "" {
+		return "", false
+	}
+	if err := global.Cache.Get(webclientSessionCachePrefix+sid, &token); err != nil {
+		return "", false
+	}
+	return token, true
 }

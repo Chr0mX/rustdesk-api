@@ -54,8 +54,39 @@ func (co *Config) ServerConfig(c *gin.Context) {
 // @Router /admin/config/webclient-session [post]
 // @Security token
 func (co *Config) WebclientSession(c *gin.Context) {
-	middleware.EstablishWebclientSession(c)
+	token, _ := c.Get("token")
+	t, _ := token.(string)
+	middleware.EstablishWebclientSession(c, t)
 	response.Success(c, nil)
+}
+
+// WebclientBridge is the reverse of WebclientSession: it lets a visitor who
+// already holds a webclient session cookie (see middleware.WebclientAuth)
+// be recognized by _admin without logging in again. Deliberately unauthed
+// (BackendUserAuth would be circular - the whole point is the caller has no
+// api-token yet) and deliberately admin-only: bouncing an ordinary user
+// straight into _admin isn't the ask, only mirroring what WebclientSession
+// already does for admins.
+// @Tags ADMIN
+// @Summary 从webclient会话桥接到_admin
+// @Description 让持有webclient会话cookie的管理员免登录进入_admin(见WebclientCookieDomain配置)
+// @Accept  json
+// @Produce  json
+// @Success 200 {object} response.Response{data=adResp.LoginPayload}
+// @Failure 500 {object} response.Response
+// @Router /admin/config/webclient-bridge [get]
+func (co *Config) WebclientBridge(c *gin.Context) {
+	token, ok := middleware.LookupWebclientSessionToken(c)
+	if !ok || token == "" {
+		response.Fail(c, 403, response.TranslateMsg(c, "NeedLogin"))
+		return
+	}
+	user, _ := service.AllService.UserService.InfoByAccessToken(token)
+	if user.Id == 0 || !service.AllService.UserService.CheckUserEnable(user) || !service.AllService.UserService.IsAdmin(user) {
+		response.Fail(c, 403, response.TranslateMsg(c, "NeedLogin"))
+		return
+	}
+	responseLoginSuccess(c, user, token)
 }
 
 // UpdateWebclientConfig forces (or, given blank values, un-forces) the

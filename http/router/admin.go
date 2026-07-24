@@ -258,6 +258,7 @@ func ConfigBind(rg *gin.RouterGroup) {
 	rs := &admin.Config{}
 
 	aR.GET("/admin", rs.AdminConfig)
+	aR.GET("/webclient-bridge", rs.WebclientBridge)
 
 	aR.Use(middleware.BackendUserAuth())
 	aR.GET("/server", rs.ServerConfig)

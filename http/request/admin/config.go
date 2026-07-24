@@ -7,4 +7,9 @@ package admin
 type WebclientConfigForm struct {
 	WebclientIdServer    string `json:"webclient_id_server"`
 	WebclientRelayServer string `json:"webclient_relay_server"`
+	// WebclientRelayFromApiServer: when true and WebclientRelayServer is
+	// blank, derive the relay-server host from api-server instead of using
+	// the plain relay-server value - useful when hbbs/hbbr are on a
+	// LAN-only address but api-server is the WAN-reachable one.
+	WebclientRelayFromApiServer bool `json:"webclient_relay_from_api_server"`
 }

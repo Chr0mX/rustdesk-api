@@ -3,6 +3,7 @@ package admin
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/lejianwen/rustdesk-api/v2/global"
+	"github.com/lejianwen/rustdesk-api/v2/http/request/admin"
 	"github.com/lejianwen/rustdesk-api/v2/http/response"
 	"github.com/lejianwen/rustdesk-api/v2/model"
 	"github.com/lejianwen/rustdesk-api/v2/service"
@@ -25,12 +26,47 @@ type Config struct {
 // @Security token
 func (co *Config) ServerConfig(c *gin.Context) {
 	cf := &response.ServerConfigResponse{
-		IdServer:    global.Config.Rustdesk.IdServer,
-		Key:         global.Config.Rustdesk.Key,
-		RelayServer: global.Config.Rustdesk.RelayServer,
-		ApiServer:   global.Config.Rustdesk.ApiServer,
+		IdServer:             global.Config.Rustdesk.IdServer,
+		Key:                  global.Config.Rustdesk.Key,
+		RelayServer:          global.Config.Rustdesk.RelayServer,
+		ApiServer:            global.Config.Rustdesk.ApiServer,
+		WebclientIdServer:    global.Config.Rustdesk.WebclientIdServer,
+		WebclientRelayServer: global.Config.Rustdesk.WebclientRelayServer,
 	}
 	response.Success(c, cf)
+}
+
+// UpdateWebclientConfig forces (or, given blank values, un-forces) the
+// id-server/relay-server the bundled webclient is handed via
+// web.Index.ConfigJs, independent of what native clients get. Persisted to
+// the config file so it survives a restart.
+// @Tags ADMIN
+// @Summary 强制设置webclient的ID/中转服务器
+// @Description 强制设置webclient的ID/中转服务器,留空则不覆盖
+// @Accept  json
+// @Produce  json
+// @Param body body admin.WebclientConfigForm true "webclient配置"
+// @Success 200 {object} response.Response
+// @Failure 500 {object} response.Response
+// @Router /admin/config/webclient [post]
+// @Security token
+func (co *Config) UpdateWebclientConfig(c *gin.Context) {
+	f := &admin.WebclientConfigForm{}
+	if err := c.ShouldBindJSON(f); err != nil {
+		response.Fail(c, 101, response.TranslateMsg(c, "ParamsError")+err.Error())
+		return
+	}
+
+	global.Config.Rustdesk.WebclientIdServer = f.WebclientIdServer
+	global.Config.Rustdesk.WebclientRelayServer = f.WebclientRelayServer
+	global.Viper.Set("rustdesk.webclient-id-server", f.WebclientIdServer)
+	global.Viper.Set("rustdesk.webclient-relay-server", f.WebclientRelayServer)
+	if err := global.Viper.WriteConfig(); err != nil {
+		response.Fail(c, 101, response.TranslateMsg(c, "OperationFailed")+err.Error())
+		return
+	}
+
+	response.Success(c, nil)
 }
 
 // AppConfig APP服务配置

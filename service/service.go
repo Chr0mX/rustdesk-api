@@ -25,6 +25,7 @@ type Service struct {
 	*LdapService
 	*AppService
 	*AdminActionLogService
+	*KeypairService
 }
 
 type Dependencies struct {

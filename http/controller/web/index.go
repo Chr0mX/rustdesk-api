@@ -14,8 +14,10 @@ func (i *Index) Index(c *gin.Context) {
 	c.Redirect(302, "/_admin/")
 }
 
-// ConfigJs seeds the values the bundled webclient (resources/web, the
-// flutter_hbb web build) reads out of localStorage on load. Without
+// ConfigJs seeds the values the bundled webclient (resources/web) reads
+// out of localStorage on load. It sets both the unprefixed keys (older
+// flutter_hbb builds) and the "wc-" prefixed keys (the current build,
+// which stores all of its settings under that prefix). Without
 // custom-rendezvous-server/key set here, connection.ts falls back to
 // its own hardcoded HOSTS list (rs-sg/rs-cn/rs-us.rustdesk.com).
 func (i *Index) ConfigJs(c *gin.Context) {

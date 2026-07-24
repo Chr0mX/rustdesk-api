@@ -27,7 +27,7 @@ Module["onRuntimeInitialized"] = function(){
 }
 
 Module["locateFile"] = function(url){
-  if(url == "libopus.wasm" && typeof LIBOPUS_WASM_URL != "undefined")
+  if(url == "libopus.wasm?v=be6f45f8" && typeof LIBOPUS_WASM_URL != "undefined")
     return LIBOPUS_WASM_URL;
   else
     return url;
@@ -1545,7 +1545,7 @@ function createExportWrapper(name, fixedasm) {
 }
 
 var wasmBinaryFile;
-  wasmBinaryFile = 'libopus.wasm';
+  wasmBinaryFile = 'libopus.wasm?v=be6f45f8';
   if (!isDataURI(wasmBinaryFile)) {
     wasmBinaryFile = locateFile(wasmBinaryFile);
   }

@@ -27,12 +27,13 @@ type Config struct {
 // @Security token
 func (co *Config) ServerConfig(c *gin.Context) {
 	cf := &response.ServerConfigResponse{
-		IdServer:             global.Config.Rustdesk.IdServer,
-		Key:                  global.Config.Rustdesk.Key,
-		RelayServer:          global.Config.Rustdesk.RelayServer,
-		ApiServer:            global.Config.Rustdesk.ApiServer,
-		WebclientIdServer:    global.Config.Rustdesk.WebclientIdServer,
-		WebclientRelayServer: global.Config.Rustdesk.WebclientRelayServer,
+		IdServer:                    global.Config.Rustdesk.IdServer,
+		Key:                         global.Config.Rustdesk.Key,
+		RelayServer:                 global.Config.Rustdesk.RelayServer,
+		ApiServer:                   global.Config.Rustdesk.ApiServer,
+		WebclientIdServer:           global.Config.Rustdesk.WebclientIdServer,
+		WebclientRelayServer:        global.Config.Rustdesk.WebclientRelayServer,
+		WebclientRelayFromApiServer: global.Config.Rustdesk.WebclientRelayFromApiServer,
 	}
 	response.Success(c, cf)
 }
@@ -112,8 +113,10 @@ func (co *Config) UpdateWebclientConfig(c *gin.Context) {
 
 	global.Config.Rustdesk.WebclientIdServer = f.WebclientIdServer
 	global.Config.Rustdesk.WebclientRelayServer = f.WebclientRelayServer
+	global.Config.Rustdesk.WebclientRelayFromApiServer = f.WebclientRelayFromApiServer
 	global.Viper.Set("rustdesk.webclient-id-server", f.WebclientIdServer)
 	global.Viper.Set("rustdesk.webclient-relay-server", f.WebclientRelayServer)
+	global.Viper.Set("rustdesk.webclient-relay-from-api-server", f.WebclientRelayFromApiServer)
 	if err := global.Viper.WriteConfig(); err != nil {
 		response.Fail(c, 101, response.TranslateMsg(c, "OperationFailed")+err.Error())
 		return

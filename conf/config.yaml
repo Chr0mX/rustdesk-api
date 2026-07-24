@@ -54,6 +54,7 @@ rustdesk:
   ws-host: ""  #eg: wss://192.168.1.3:4443
   webclient-id-server: ""  #force the bundled webclient to use this id-server instead of id-server above; leave blank to inherit it. Editable from admin > settings.
   webclient-relay-server: ""  #same, for relay-server
+  webclient-relay-from-api-server: false  #when true and webclient-relay-server above is blank, derive the webclient's relay host from api-server instead of using relay-server's host verbatim (keeps relay-server's port). Useful when hbbs/hbbr are LAN-only but api-server is WAN-reachable. Editable from admin > settings.
 logger:
   path: "./runtime/log.txt"
   level: "info" #trace,debug,info,warn,error,fatal

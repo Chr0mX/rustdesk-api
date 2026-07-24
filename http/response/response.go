@@ -49,12 +49,13 @@ func Error(c *gin.Context, message string) {
 }
 
 type ServerConfigResponse struct {
-	IdServer             string `json:"id_server"`
-	Key                  string `json:"key"`
-	RelayServer          string `json:"relay_server"`
-	ApiServer            string `json:"api_server"`
-	WebclientIdServer    string `json:"webclient_id_server"`
-	WebclientRelayServer string `json:"webclient_relay_server"`
+	IdServer                    string `json:"id_server"`
+	Key                         string `json:"key"`
+	RelayServer                 string `json:"relay_server"`
+	ApiServer                   string `json:"api_server"`
+	WebclientIdServer           string `json:"webclient_id_server"`
+	WebclientRelayServer        string `json:"webclient_relay_server"`
+	WebclientRelayFromApiServer bool   `json:"webclient_relay_from_api_server"`
 }
 
 func TranslateMsg(c *gin.Context, messageId string) string {

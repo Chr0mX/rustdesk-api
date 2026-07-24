@@ -141,6 +141,15 @@ func InitGlobal() {
 			Password: global.Config.Cache.RedisPwd,
 			DB:       global.Config.Cache.RedisDb,
 		})
+	} else {
+		// Any other value (including "", the default when cache.type isn't
+		// set in config.yaml at all - true for the shipped conf/config.yaml)
+		// used to leave global.Cache nil forever, since only "file"/"redis"
+		// were ever handled here. Nothing panicked on that historically
+		// because nothing called global.Cache before middleware.WebclientAuth
+		// started using it for webclient sessions. Falls back to an
+		// in-memory cache, same as cache.New's own default.
+		global.Cache = cache.New(global.Config.Cache.Type)
 	}
 	//gorm
 	if global.Config.Gorm.Type == config.TypeMysql {

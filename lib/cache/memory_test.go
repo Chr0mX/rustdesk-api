@@ -47,12 +47,12 @@ func TestMemorySetExpGet(t *testing.T) {
 	}
 	fmt.Println("res 3", res)
 	time.Sleep(4 * time.Second)
-	//res = ""
+	//res = "", 此时key 3已过期，应返回ErrNotFound
 	err = mc.Get("3", &res)
-	if err != nil {
-		t.Fatalf("读取失败" + err.Error())
+	if err != ErrNotFound {
+		t.Fatalf("过期key应返回ErrNotFound")
 	}
-	fmt.Println("res 3", res)
+	fmt.Println("res 3 expired, err:", err)
 	err = mc.Get("2", &res)
 	if err != nil {
 		t.Fatalf("读取失败" + err.Error())

@@ -28,8 +28,10 @@ func (fc *FileCache) getLock(key string) *sync.Mutex {
 
 func (c *FileCache) Get(key string, value interface{}) error {
 	data, _ := c.getValue(key)
-	err := DecodeValue(data, value)
-	return err
+	if data == "" {
+		return ErrNotFound
+	}
+	return DecodeValue(data, value)
 }
 
 // 获取值,如果文件不存在或者过期，返回空，过滤掉错误
@@ -78,6 +80,18 @@ func (c *FileCache) Set(key string, value interface{}, exp int) error {
 	}
 
 	err = c.saveValue(key, str, exp)
+	return err
+}
+
+func (c *FileCache) Delete(key string) error {
+	f := c.fileName(key)
+	lock := c.getLock(f)
+	lock.Lock()
+	defer lock.Unlock()
+	err := os.Remove(f)
+	if err != nil && os.IsNotExist(err) {
+		return nil
+	}
 	return err
 }
 

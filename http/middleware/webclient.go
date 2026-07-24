@@ -99,6 +99,24 @@ func EstablishWebclientSession(c *gin.Context, adminToken string) {
 	c.SetCookie(webclientSessionCookie, sid, webclientSessionTTL, "/", global.Config.App.WebclientCookieDomain, secure, true)
 }
 
+// RevokeWebclientSession invalidates the visitor's webclient session, if
+// any: deletes it from global.Cache (so a still-held cookie or a copy of
+// it can't be replayed) and clears the cookie in the response. Called from
+// admin.Login.Logout so logging out of _admin also signs you out of the
+// webclient - otherwise a previously-authed webclient tab (or the cookie
+// alone, replayed) would keep working after logout. The next load of
+// /webclient-config/index.js for this visitor now hits the unauthed path
+// in web.Index.ConfigJs, which actively clears any id-server/relay-server/
+// key it had previously set, rather than just leaving them stale.
+func RevokeWebclientSession(c *gin.Context) {
+	if sid, err := c.Cookie(webclientSessionCookie); err == nil && sid != "" {
+		_ = global.Cache.Delete(webclientSessionCachePrefix + sid)
+	}
+	secure := c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https"
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie(webclientSessionCookie, "", -1, "/", global.Config.App.WebclientCookieDomain, secure, true)
+}
+
 // LookupWebclientSessionToken returns the admin api-token tied to the
 // visitor's webclient session cookie, for admin.Config.WebclientBridge to
 // bounce them straight into _admin. ok is false when there's no valid

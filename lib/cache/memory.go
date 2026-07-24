@@ -70,21 +70,28 @@ func (m *MemoryCache) Get(key string, value interface{}) error {
 	defer m.mu.Unlock()
 
 	if m.data == nil {
-		return nil
+		return ErrNotFound
 	}
 
-	if item, ok := m.data[key]; ok {
-		if item.Expiration < time.Now().UnixNano() {
-			m.deleteItem(item)
-			return nil
-		}
-		//移动到队列尾部
-		m.ll.MoveToBack(item.ListEle)
+	item, ok := m.data[key]
+	if !ok {
+		return ErrNotFound
+	}
+	if item.Expiration < time.Now().UnixNano() {
+		m.deleteItem(item)
+		return ErrNotFound
+	}
+	//移动到队列尾部
+	m.ll.MoveToBack(item.ListEle)
 
-		err := DecodeValue(item.Value, value)
-		if err != nil {
-			return err
-		}
+	return DecodeValue(item.Value, value)
+}
+
+func (m *MemoryCache) Delete(key string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if item, ok := m.data[key]; ok {
+		m.deleteItem(item)
 	}
 	return nil
 }

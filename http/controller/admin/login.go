@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lejianwen/rustdesk-api/v2/global"
 	"github.com/lejianwen/rustdesk-api/v2/http/controller/api"
+	"github.com/lejianwen/rustdesk-api/v2/http/middleware"
 	"github.com/lejianwen/rustdesk-api/v2/http/request/admin"
 	apiReq "github.com/lejianwen/rustdesk-api/v2/http/request/api"
 	"github.com/lejianwen/rustdesk-api/v2/http/response"
@@ -144,6 +145,7 @@ func (ct *Login) Logout(c *gin.Context) {
 	if ok {
 		service.AllService.UserService.Logout(u, token.(string))
 	}
+	middleware.RevokeWebclientSession(c)
 	response.Success(c, nil)
 }
 

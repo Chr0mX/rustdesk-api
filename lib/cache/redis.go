@@ -39,6 +39,10 @@ func (c *RedisCache) Set(key string, value interface{}, exp int) error {
 	return err1
 }
 
+func (c *RedisCache) Delete(key string) error {
+	return c.rdb.Del(ctx, key).Err()
+}
+
 func (c *RedisCache) Gc() error {
 	return nil
 }

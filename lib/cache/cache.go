@@ -2,11 +2,19 @@ package cache
 
 import (
 	"encoding/json"
+	"errors"
 )
+
+// ErrNotFound is returned by Get for a key that's missing or expired.
+// Callers that need to distinguish "genuinely absent" from "present but
+// zero-valued" (e.g. middleware.WebclientAuth, which must not treat a
+// forged/unknown session cookie as valid) should check for this.
+var ErrNotFound = errors.New("cache: key not found")
 
 type Handler interface {
 	Get(key string, value interface{}) error
 	Set(key string, value interface{}, exp int) error
+	Delete(key string) error
 	Gc() error
 }
 

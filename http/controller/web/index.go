@@ -11,6 +11,20 @@ import (
 type Index struct {
 }
 
+// clearConfigScript wipes whatever ConfigJs previously set, for a visitor
+// who's no longer authed (see ConfigJs). Mirrors every key the authed
+// branch below sets - both the unprefixed and "wc-" prefixed forms.
+const clearConfigScript = `localStorage.removeItem('api-server');
+localStorage.removeItem('custom-rendezvous-server');
+localStorage.removeItem('relay-server');
+localStorage.removeItem('key');
+const ws2_prefix = 'wc-';
+localStorage.removeItem(ws2_prefix+'api-server');
+localStorage.removeItem(ws2_prefix+'custom-rendezvous-server');
+localStorage.removeItem(ws2_prefix+'relay-server');
+localStorage.removeItem(ws2_prefix+'key');
+`
+
 func (i *Index) Index(c *gin.Context) {
 	c.Redirect(302, "/_admin/")
 }
@@ -37,8 +51,15 @@ func (i *Index) ConfigJs(c *gin.Context) {
 
 	authed, _ := c.Get(middleware.WebclientAuthedKey)
 	if authed != true {
+		// Actively wipe any id-server/relay-server/api-server/key this
+		// visitor had from before, rather than just leaving them be. Without
+		// this, logging out of _admin (middleware.RevokeWebclientSession)
+		// would revoke the session server-side, but a webclient tab that
+		// still had the old values cached in localStorage would keep
+		// showing them until something else overwrote them - so
+		// deauthenticating wouldn't visibly do anything on that side.
 		c.Header("Content-Type", "application/javascript")
-		c.String(200, "// not authenticated: no server config for you\n")
+		c.String(200, clearConfigScript)
 		return
 	}
 

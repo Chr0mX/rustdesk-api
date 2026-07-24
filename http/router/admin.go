@@ -263,6 +263,9 @@ func ConfigBind(rg *gin.RouterGroup) {
 	aR.GET("/server", rs.ServerConfig)
 	aR.GET("/app", rs.AppConfig)
 
+	aR.Use(middleware.AdminPrivilege())
+	aR.POST("/webclient", rs.UpdateWebclientConfig)
+
 }
 
 /*

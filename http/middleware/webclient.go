@@ -65,14 +65,27 @@ func WebclientAuth() gin.HandlerFunc {
 		}
 
 		if authed {
-			sid := utils.RandomString(32)
-			_ = global.Cache.Set(webclientSessionCachePrefix+sid, true, webclientSessionTTL)
-			secure := c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https"
-			c.SetSameSite(http.SameSiteLaxMode)
-			c.SetCookie(webclientSessionCookie, sid, webclientSessionTTL, "/", "", secure, true)
+			EstablishWebclientSession(c)
 		}
 
 		c.Set(WebclientAuthedKey, authed)
 		c.Next()
 	}
+}
+
+// EstablishWebclientSession mints a short-lived opaque session id, stores it
+// server side (global.Cache) and drops it in an httpOnly cookie, same as
+// WebclientAuth does on a successful ?token=/?share_token= check. Exported
+// so an already-authenticated admin request (see
+// admin.Config.WebclientSession) can proactively establish the same
+// session - useful when the admin console and webclient are reverse-proxied
+// under different subdomains (see App.WebclientCookieDomain): the admin
+// console can call this right after login so the webclient recognizes the
+// visitor without needing a ?token= in the URL.
+func EstablishWebclientSession(c *gin.Context) {
+	sid := utils.RandomString(32)
+	_ = global.Cache.Set(webclientSessionCachePrefix+sid, true, webclientSessionTTL)
+	secure := c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https"
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie(webclientSessionCookie, sid, webclientSessionTTL, "/", global.Config.App.WebclientCookieDomain, secure, true)
 }

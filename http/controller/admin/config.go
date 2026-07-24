@@ -3,6 +3,7 @@ package admin
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/lejianwen/rustdesk-api/v2/global"
+	"github.com/lejianwen/rustdesk-api/v2/http/middleware"
 	"github.com/lejianwen/rustdesk-api/v2/http/request/admin"
 	"github.com/lejianwen/rustdesk-api/v2/http/response"
 	"github.com/lejianwen/rustdesk-api/v2/model"
@@ -34,6 +35,27 @@ func (co *Config) ServerConfig(c *gin.Context) {
 		WebclientRelayServer: global.Config.Rustdesk.WebclientRelayServer,
 	}
 	response.Success(c, cf)
+}
+
+// WebclientSession lets an already-authenticated admin console user
+// proactively establish a webclient auth session (see
+// middleware.WebclientAuth), so opening the webclient afterwards doesn't
+// need a ?token= in the URL. Mainly useful when the admin console and
+// webclient are reverse-proxied under different subdomains of the same
+// domain and App.WebclientCookieDomain is set to that shared parent domain
+// - otherwise this is equivalent to what clicking "Web Client" already does.
+// @Tags ADMIN
+// @Summary 建立webclient会话
+// @Description 让已登录的后台用户预先建立webclient会话(见WebclientCookieDomain配置)
+// @Accept  json
+// @Produce  json
+// @Success 200 {object} response.Response
+// @Failure 500 {object} response.Response
+// @Router /admin/config/webclient-session [post]
+// @Security token
+func (co *Config) WebclientSession(c *gin.Context) {
+	middleware.EstablishWebclientSession(c)
+	response.Success(c, nil)
 }
 
 // UpdateWebclientConfig forces (or, given blank values, un-forces) the

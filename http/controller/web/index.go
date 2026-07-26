@@ -58,27 +58,79 @@ const webclientLoginPage = `<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>RustDesk</title>
 <style>
-  body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f0f2f5;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;}
-  .card{background:#fff;padding:32px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.08);width:320px;box-sizing:border-box;}
-  h1{font-size:20px;text-align:center;margin:0 0 20px;color:#1f2329;}
-  input{width:100%;box-sizing:border-box;padding:10px;margin-bottom:12px;border:1px solid #d9d9d9;border-radius:4px;font-size:14px;}
-  button{width:100%;padding:10px;background:#1677ff;color:#fff;border:none;border-radius:4px;font-size:14px;cursor:pointer;}
-  button:hover{background:#4b96ff;}
-  button:disabled{background:#9cc4ff;cursor:default;}
-  .err{color:#f56c6c;font-size:13px;margin-bottom:12px;display:none;}
+  :root{
+    --bg-page:#f2f3f5; --bg-card:#fff; --text-primary:#1f2329; --text-secondary:#8a8f99;
+    --border:#d9d9d9; --primary:#1677ff; --primary-hover:#4b96ff; --primary-disabled:#9cc4ff;
+    --icon:#8a8f99; --err:#f56c6c;
+  }
+  html.dark{
+    --bg-page:#18222c; --bg-card:#20293a; --text-primary:#e5eaf3; --text-secondary:#a3a6ad;
+    --border:#3a4659; --icon:#a3a6ad;
+  }
+  *{box-sizing:border-box;}
+  body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg-page);display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;transition:background-color .2s;}
+  .top-bar{position:fixed;top:20px;right:24px;}
+  .theme-toggle{cursor:pointer;background:none;border:none;padding:6px;border-radius:50%;display:flex;color:var(--icon);}
+  .theme-toggle:hover{background:rgba(128,128,128,.15);}
+  .theme-toggle svg{width:20px;height:20px;}
+  .card{background:var(--bg-card);padding:32px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.08);width:340px;box-sizing:border-box;text-align:center;}
+  .brand{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:6px;}
+  .brand svg{width:36px;height:36px;flex-shrink:0;}
+  .brand-name{font-size:26px;font-weight:700;color:var(--text-primary);}
+  .subtitle{font-size:14px;color:var(--text-secondary);margin-bottom:26px;}
+  .field{position:relative;margin-bottom:14px;}
+  .field svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--icon);}
+  input{width:100%;box-sizing:border-box;padding:10px 12px 10px 36px;border:1px solid var(--border);border-radius:4px;font-size:14px;background:var(--bg-card);color:var(--text-primary);}
+  input:focus{outline:none;border-color:var(--primary);}
+  button[type=submit]{width:100%;padding:10px;background:var(--primary);color:#fff;border:none;border-radius:4px;font-size:14px;cursor:pointer;margin-top:6px;}
+  button[type=submit]:hover{background:var(--primary-hover);}
+  button[type=submit]:disabled{background:var(--primary-disabled);cursor:default;}
+  .err{color:var(--err);font-size:13px;margin-bottom:12px;display:none;text-align:left;}
 </style>
 </head>
 <body>
+<div class="top-bar">
+  <button type="button" class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode"></button>
+</div>
 <div class="card">
-  <h1>RustDesk</h1>
+  <div class="brand">
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="24" height="24" rx="6" fill="#1677ff"/><path d="M6 8.5C6 7.67 6.67 7 7.5 7h9c.83 0 1.5.67 1.5 1.5v6c0 .83-.67 1.5-1.5 1.5h-9A1.5 1.5 0 0 1 6 14.5v-6Z" stroke="#fff" stroke-width="1.4"/><path d="M9.5 17h5" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/></svg>
+    <span class="brand-name">RustDesk</span>
+  </div>
+  <div class="subtitle">Web Client</div>
   <div class="err" id="err"></div>
   <form id="f">
-    <input type="text" id="username" placeholder="Username" autocomplete="username" required>
-    <input type="password" id="password" placeholder="Password" autocomplete="current-password" required>
+    <div class="field">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" stroke="currentColor" stroke-width="1.6"/><path d="M4.5 20c1.3-3.5 4.2-5.5 7.5-5.5s6.2 2 7.5 5.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <input type="text" id="username" placeholder="Username" autocomplete="username" required>
+    </div>
+    <div class="field">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="10.5" width="14" height="9" rx="1.6" stroke="currentColor" stroke-width="1.6"/><path d="M8 10.5V8a4 4 0 1 1 8 0v2.5" stroke="currentColor" stroke-width="1.6"/></svg>
+      <input type="password" id="password" placeholder="Password" autocomplete="current-password" required>
+    </div>
     <button type="submit" id="submit">Login</button>
   </form>
 </div>
 <script>
+(function () {
+  var root = document.documentElement;
+  var storeKey = 'webclient-login-theme';
+  var sun = '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.6"/><path d="M12 2v2M12 20v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2 12h2M20 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+  var moon = '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+  var btn = document.getElementById('themeToggle');
+  function apply(dark) {
+    root.classList.toggle('dark', dark);
+    btn.innerHTML = dark ? sun : moon;
+  }
+  var stored = localStorage.getItem(storeKey);
+  var dark = stored ? stored === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+  apply(dark);
+  btn.addEventListener('click', function () {
+    dark = !dark;
+    localStorage.setItem(storeKey, dark ? 'dark' : 'light');
+    apply(dark);
+  });
+})();
 document.getElementById('f').addEventListener('submit', async function (e) {
   e.preventDefault();
   var errEl = document.getElementById('err');

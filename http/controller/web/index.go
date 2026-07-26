@@ -5,6 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lejianwen/rustdesk-api/v2/global"
 	"github.com/lejianwen/rustdesk-api/v2/http/middleware"
+	"github.com/lejianwen/rustdesk-api/v2/service"
 	"strconv"
 )
 
@@ -110,6 +111,25 @@ document.getElementById('f').addEventListener('submit', async function (e) {
 </body>
 </html>`
 
+// WebclientLogout is what the "Logout" link ConfigJs injects into the
+// authenticated webclient page (see below) points at. The bundled webclient
+// has no idea our custom wc_sess cookie exists, so nothing inside it could
+// ever trigger a real sign-out - without this, the only way to actually
+// deauthenticate was to log out of _admin instead. Also revokes the
+// underlying access_token itself (service.UserService.Logout), not just
+// the wc_sess cookie/cache entry, so replaying the same ?token=... in the
+// URL bar afterward doesn't just quietly re-authenticate.
+func (i *Index) WebclientLogout(c *gin.Context) {
+	if token, ok := middleware.LookupWebclientSessionToken(c); ok && token != "" {
+		user, _ := service.AllService.UserService.InfoByAccessToken(token)
+		if user.Id != 0 {
+			service.AllService.UserService.Logout(user, token)
+		}
+	}
+	middleware.RevokeWebclientSession(c)
+	c.Redirect(302, "/webclient/")
+}
+
 // ConfigJs seeds the values the bundled webclient (resources/web) reads
 // out of localStorage on load. It sets both the unprefixed keys (older
 // flutter_hbb builds) and the "wc-" prefixed keys (the current build,
@@ -161,6 +181,19 @@ localStorage.setItem(ws2_prefix+'key', %v);
 
 window.webclient_magic_queryonline = %d;
 window.ws_host = '%v';
+
+// The bundled webclient has no concept of our custom session cookie, so
+// nothing inside it can trigger a real sign-out - inject a visible link
+// that does, since otherwise the only way to deauthenticate was via _admin.
+(function () {
+  var a = document.createElement('a');
+  a.href = '/webclient-logout';
+  a.textContent = 'Logout';
+  a.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:2147483647;background:#1677ff;color:#fff;padding:4px 10px;border-radius:4px;font:12px system-ui,sans-serif;text-decoration:none;opacity:.85;';
+  document.addEventListener('DOMContentLoaded', function () {
+    document.body.appendChild(a);
+  });
+})();
 `, strconv.Quote(apiServer), strconv.Quote(idServer), strconv.Quote(relayServer), strconv.Quote(key),
 		strconv.Quote(apiServer), strconv.Quote(idServer), strconv.Quote(relayServer), strconv.Quote(key),
 		magicQueryonline, global.Config.Rustdesk.WsHost)

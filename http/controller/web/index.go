@@ -1,10 +1,12 @@
 package web
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/lejianwen/rustdesk-api/v2/global"
 	"github.com/lejianwen/rustdesk-api/v2/http/middleware"
+	apiResp "github.com/lejianwen/rustdesk-api/v2/http/response/api"
 	"github.com/lejianwen/rustdesk-api/v2/service"
 	"strconv"
 )
@@ -20,6 +22,7 @@ localStorage.removeItem('custom-rendezvous-server');
 localStorage.removeItem('relay-server');
 localStorage.removeItem('key');
 localStorage.removeItem('access_token');
+localStorage.removeItem('user_info');
 const ws2_prefix = 'wc-';
 localStorage.removeItem(ws2_prefix+'api-server');
 localStorage.removeItem(ws2_prefix+'custom-rendezvous-server');
@@ -172,18 +175,26 @@ func (i *Index) ConfigJs(c *gin.Context) {
 	magicQueryonline := global.Config.Rustdesk.WebclientMagicQueryonline
 
 	// The bundled webclient has its own, entirely separate "Account" login
-	// under Settings, unrelated to wc_sess: it reads/writes a local option
-	// literally named "access_token" (see hm() in main.dart.js, which builds
-	// its Authorization header from getByName("option:local","access_token"))
-	// and prompts its own login dialog whenever that's unset. Without this,
-	// a visitor who already authenticated through our outer login page would
-	// hit a second, unrelated login prompt the moment they opened Settings ->
-	// Account. Since our login already went through the same POST /api/login
-	// and got back the same kind of access_token, just seed it here too so
-	// the bundled client already considers itself logged in.
-	accessTokenScript := "localStorage.removeItem('access_token');"
+	// under Settings, unrelated to wc_sess: it reads/writes two local
+	// options - "access_token" (used to build its Authorization header, see
+	// hm() in main.dart.js) and "user_info" (a JSON-encoded UserPayload,
+	// see bLJ() in main.dart.js: it JSON-decodes this and treats an empty
+	// string as "not logged in" - access_token alone isn't enough, the
+	// Account page reads the display fields straight from user_info without
+	// hitting the network). Without both set, a visitor who already
+	// authenticated through our outer login page would still hit a second,
+	// unrelated login prompt the moment they opened Settings -> Account.
+	// Since our login already went through the same POST /api/login and got
+	// back the same access_token + user shape, seed both here so the
+	// bundled client already considers itself logged in.
+	accessTokenScript := "localStorage.removeItem('access_token');\nlocalStorage.removeItem('user_info');"
 	if sessionToken, hasSession := middleware.LookupWebclientSessionToken(c); hasSession && sessionToken != "" {
-		accessTokenScript = fmt.Sprintf("localStorage.setItem('access_token', %v);", strconv.Quote(sessionToken))
+		if user, _ := service.AllService.UserService.InfoByAccessToken(sessionToken); user.Id != 0 {
+			if userInfoJson, err := json.Marshal((&apiResp.UserPayload{}).FromUser(user)); err == nil {
+				accessTokenScript = fmt.Sprintf("localStorage.setItem('access_token', %v);\nlocalStorage.setItem('user_info', %v);",
+					strconv.Quote(sessionToken), strconv.Quote(string(userInfoJson)))
+			}
+		}
 	}
 
 	tmp := fmt.Sprintf(`localStorage.setItem('api-server', %v);

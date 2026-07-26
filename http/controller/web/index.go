@@ -29,6 +29,87 @@ func (i *Index) Index(c *gin.Context) {
 	c.Redirect(302, "/_admin/")
 }
 
+// WebclientLogin is what unauthenticated visitors to /webclient/* get
+// instead of the bundled webclient (see router.go) - a minimal, dependency-
+// free login form. It's deliberately separate from _admin's login: any
+// enabled account can sign in here, not just admins, since there's no
+// reason a non-admin user shouldn't be able to reach the webclient with
+// their own account. It authenticates against the same POST /api/login
+// every native RustDesk client already uses (not /admin/login), then
+// redirects to /webclient/?token=<access_token>, which
+// middleware.WebclientAuth already accepts from any enabled user - no new
+// server-side auth path needed, just a UI for the one that already existed
+// but only the "Web Client" button in _admin could reach.
+func (i *Index) WebclientLogin(c *gin.Context) {
+	c.Header("Cache-Control", "no-store, must-revalidate")
+	c.Header("Content-Type", "text/html; charset=utf-8")
+	c.String(200, webclientLoginPage)
+}
+
+const webclientLoginPage = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RustDesk</title>
+<style>
+  body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f0f2f5;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;}
+  .card{background:#fff;padding:32px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.08);width:320px;box-sizing:border-box;}
+  h1{font-size:20px;text-align:center;margin:0 0 20px;color:#1f2329;}
+  input{width:100%;box-sizing:border-box;padding:10px;margin-bottom:12px;border:1px solid #d9d9d9;border-radius:4px;font-size:14px;}
+  button{width:100%;padding:10px;background:#1677ff;color:#fff;border:none;border-radius:4px;font-size:14px;cursor:pointer;}
+  button:hover{background:#4b96ff;}
+  button:disabled{background:#9cc4ff;cursor:default;}
+  .err{color:#f56c6c;font-size:13px;margin-bottom:12px;display:none;}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>RustDesk</h1>
+  <div class="err" id="err"></div>
+  <form id="f">
+    <input type="text" id="username" placeholder="Username" autocomplete="username" required>
+    <input type="password" id="password" placeholder="Password" autocomplete="current-password" required>
+    <button type="submit" id="submit">Login</button>
+  </form>
+</div>
+<script>
+document.getElementById('f').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  var errEl = document.getElementById('err');
+  var btn = document.getElementById('submit');
+  errEl.style.display = 'none';
+  btn.disabled = true;
+  try {
+    var res = await fetch('/api/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        username: document.getElementById('username').value,
+        password: document.getElementById('password').value,
+        deviceInfo: {name: navigator.userAgent, os: 'web', type: 'webclient'},
+        id: '',
+        uuid: ''
+      })
+    });
+    var data = await res.json();
+    if (res.ok && data.access_token) {
+      window.location.href = '/webclient/?token=' + encodeURIComponent(data.access_token) + window.location.hash;
+    } else {
+      errEl.textContent = (data && data.message) || 'Login failed';
+      errEl.style.display = 'block';
+      btn.disabled = false;
+    }
+  } catch (err) {
+    errEl.textContent = 'Login failed';
+    errEl.style.display = 'block';
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>`
+
 // ConfigJs seeds the values the bundled webclient (resources/web) reads
 // out of localStorage on load. It sets both the unprefixed keys (older
 // flutter_hbb builds) and the "wc-" prefixed keys (the current build,

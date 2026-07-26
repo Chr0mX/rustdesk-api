@@ -20,8 +20,20 @@ func WebInit(g *gin.Engine) {
 
 		g.GET("/webclient-config/index.js", wcAuth, i.ConfigJs)
 
+		// Unauthenticated visitors get web.Index.WebclientLogin instead of
+		// the bundled webclient - any enabled account can sign in there
+		// (not just admins), which then redirects to /webclient/?token=...
+		// and lands back here, now authed.
+		requireWebclientAuth := func(c *gin.Context) {
+			authed, _ := c.Get(middleware.WebclientAuthedKey)
+			if authed != true {
+				i.WebclientLogin(c)
+				c.Abort()
+			}
+		}
+
 		wc := g.Group("/webclient")
-		wc.Use(wcAuth)
+		wc.Use(wcAuth, requireWebclientAuth)
 		wc.StaticFS("/", http.Dir(global.Config.Gin.ResourcesPath+"/web"))
 	}
 	g.StaticFS("/_admin", http.Dir(global.Config.Gin.ResourcesPath+"/admin"))

@@ -28,6 +28,8 @@ localStorage.removeItem(ws2_prefix+'api-server');
 localStorage.removeItem(ws2_prefix+'custom-rendezvous-server');
 localStorage.removeItem(ws2_prefix+'relay-server');
 localStorage.removeItem(ws2_prefix+'key');
+localStorage.removeItem(ws2_prefix+'access_token');
+localStorage.removeItem(ws2_prefix+'user_info');
 `
 
 func (i *Index) Index(c *gin.Context) {
@@ -227,24 +229,31 @@ func (i *Index) ConfigJs(c *gin.Context) {
 	magicQueryonline := global.Config.Rustdesk.WebclientMagicQueryonline
 
 	// The bundled webclient has its own, entirely separate "Account" login
-	// under Settings, unrelated to wc_sess: it reads/writes two local
-	// options - "access_token" (used to build its Authorization header, see
-	// hm() in main.dart.js) and "user_info" (a JSON-encoded UserPayload,
-	// see bLJ() in main.dart.js: it JSON-decodes this and treats an empty
-	// string as "not logged in" - access_token alone isn't enough, the
-	// Account page reads the display fields straight from user_info without
-	// hitting the network). Without both set, a visitor who already
-	// authenticated through our outer login page would still hit a second,
-	// unrelated login prompt the moment they opened Settings -> Account.
-	// Since our login already went through the same POST /api/login and got
-	// back the same access_token + user shape, seed both here so the
-	// bundled client already considers itself logged in.
-	accessTokenScript := "localStorage.removeItem('access_token');\nlocalStorage.removeItem('user_info');"
+	// under Settings, unrelated to wc_sess. Two different layers read the
+	// login state from two DIFFERENT localStorage namespaces:
+	//   - the Dart/Rust core (main.dart.js) reads plain, unprefixed keys
+	//     "access_token"/"user_info" (see hm()/bLJ() in main.dart.js) -
+	//     this is what actually authorizes API calls like /api/currentUser.
+	//   - the JS web-shell that renders the Settings UI (js/dist/index.js)
+	//     reads its OWN "wc-" prefixed copies via a separate storage
+	//     wrapper (class k, prefix "wc-" - see its "wc-access_token"/
+	//     "wc-user_info" usage), same convention already used below for
+	//     api-server/relay-server/key. Setting only the unprefixed pair
+	//     satisfies the core (API calls succeed) but leaves the Account
+	//     *page* itself still showing a login prompt, since it never reads
+	//     the unprefixed keys at all.
+	// Both must be set for a visitor who already authenticated through our
+	// outer login page to avoid a second, unrelated login prompt inside
+	// Settings -> Account.
+	accessTokenScript := "localStorage.removeItem('access_token');\nlocalStorage.removeItem('user_info');\nlocalStorage.removeItem('wc-access_token');\nlocalStorage.removeItem('wc-user_info');"
 	if sessionToken, hasSession := middleware.LookupWebclientSessionToken(c); hasSession && sessionToken != "" {
 		if user, _ := service.AllService.UserService.InfoByAccessToken(sessionToken); user.Id != 0 {
 			if userInfoJson, err := json.Marshal((&apiResp.UserPayload{}).FromUser(user)); err == nil {
-				accessTokenScript = fmt.Sprintf("localStorage.setItem('access_token', %v);\nlocalStorage.setItem('user_info', %v);",
-					strconv.Quote(sessionToken), strconv.Quote(string(userInfoJson)))
+				quotedToken := strconv.Quote(sessionToken)
+				quotedUserInfo := strconv.Quote(string(userInfoJson))
+				accessTokenScript = fmt.Sprintf(
+					"localStorage.setItem('access_token', %v);\nlocalStorage.setItem('user_info', %v);\nlocalStorage.setItem('wc-access_token', %v);\nlocalStorage.setItem('wc-user_info', %v);",
+					quotedToken, quotedUserInfo, quotedToken, quotedUserInfo)
 			}
 		}
 	}

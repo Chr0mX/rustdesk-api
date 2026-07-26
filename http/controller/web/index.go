@@ -19,6 +19,7 @@ const clearConfigScript = `localStorage.removeItem('api-server');
 localStorage.removeItem('custom-rendezvous-server');
 localStorage.removeItem('relay-server');
 localStorage.removeItem('key');
+localStorage.removeItem('access_token');
 const ws2_prefix = 'wc-';
 localStorage.removeItem(ws2_prefix+'api-server');
 localStorage.removeItem(ws2_prefix+'custom-rendezvous-server');
@@ -169,10 +170,27 @@ func (i *Index) ConfigJs(c *gin.Context) {
 	relayServer := global.Config.Rustdesk.EffectiveWebclientRelayServer()
 	key := global.Config.Rustdesk.Key
 	magicQueryonline := global.Config.Rustdesk.WebclientMagicQueryonline
+
+	// The bundled webclient has its own, entirely separate "Account" login
+	// under Settings, unrelated to wc_sess: it reads/writes a local option
+	// literally named "access_token" (see hm() in main.dart.js, which builds
+	// its Authorization header from getByName("option:local","access_token"))
+	// and prompts its own login dialog whenever that's unset. Without this,
+	// a visitor who already authenticated through our outer login page would
+	// hit a second, unrelated login prompt the moment they opened Settings ->
+	// Account. Since our login already went through the same POST /api/login
+	// and got back the same kind of access_token, just seed it here too so
+	// the bundled client already considers itself logged in.
+	accessTokenScript := "localStorage.removeItem('access_token');"
+	if sessionToken, hasSession := middleware.LookupWebclientSessionToken(c); hasSession && sessionToken != "" {
+		accessTokenScript = fmt.Sprintf("localStorage.setItem('access_token', %v);", strconv.Quote(sessionToken))
+	}
+
 	tmp := fmt.Sprintf(`localStorage.setItem('api-server', %v);
 localStorage.setItem('custom-rendezvous-server', %v);
 localStorage.setItem('relay-server', %v);
 localStorage.setItem('key', %v);
+%s
 const ws2_prefix = 'wc-';
 localStorage.setItem(ws2_prefix+'api-server', %v);
 localStorage.setItem(ws2_prefix+'custom-rendezvous-server', %v);
@@ -195,6 +213,7 @@ window.ws_host = '%v';
   });
 })();
 `, strconv.Quote(apiServer), strconv.Quote(idServer), strconv.Quote(relayServer), strconv.Quote(key),
+		accessTokenScript,
 		strconv.Quote(apiServer), strconv.Quote(idServer), strconv.Quote(relayServer), strconv.Quote(key),
 		magicQueryonline, global.Config.Rustdesk.WsHost)
 

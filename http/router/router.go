@@ -19,6 +19,10 @@ func WebInit(g *gin.Engine) {
 		wcAuth := middleware.WebclientAuth()
 
 		g.GET("/webclient-config/index.js", wcAuth, i.ConfigJs)
+		// Linked from the "Logout" button ConfigJs injects into the
+		// authenticated webclient page - not nested under /webclient/ since
+		// that'd conflict with its *filepath wildcard below.
+		g.GET("/webclient-logout", i.WebclientLogout)
 
 		// Unauthenticated visitors get web.Index.WebclientLogin instead of
 		// the bundled webclient - any enabled account can sign in there

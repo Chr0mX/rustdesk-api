@@ -270,16 +270,24 @@ localStorage.setItem(ws2_prefix+'relay-server', %v);
 localStorage.setItem(ws2_prefix+'key', %v);
 
 window.webclient_magic_queryonline = %d;
-window.ws_host = '%v';
+window.ws_host = %v;
 
 // The bundled webclient has no concept of our custom session cookie, so
-// nothing inside it can trigger a real sign-out - inject a visible link
-// that does, since otherwise the only way to deauthenticate was via _admin.
+// nothing inside it can trigger a real sign-out - inject a visible button
+// that does, since otherwise the only way to deauthenticate was via
+// _admin. POSTs rather than navigating a plain <a href> so a cross-site
+// link/image can't trigger it (see /webclient-logout's POST-only route).
 (function () {
   var a = document.createElement('a');
-  a.href = '/webclient-logout';
+  a.href = '#';
   a.textContent = 'Logout';
-  a.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:2147483647;background:#1677ff;color:#fff;padding:4px 10px;border-radius:4px;font:12px system-ui,sans-serif;text-decoration:none;opacity:.85;';
+  a.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:2147483647;background:#1677ff;color:#fff;padding:4px 10px;border-radius:4px;font:12px system-ui,sans-serif;text-decoration:none;opacity:.85;cursor:pointer;';
+  a.addEventListener('click', function (e) {
+    e.preventDefault();
+    fetch('/webclient-logout', {method: 'POST'}).catch(function () {}).then(function () {
+      window.location.href = '/webclient/';
+    });
+  });
   document.addEventListener('DOMContentLoaded', function () {
     document.body.appendChild(a);
   });
@@ -287,7 +295,7 @@ window.ws_host = '%v';
 `, strconv.Quote(apiServer), strconv.Quote(idServer), strconv.Quote(relayServer), strconv.Quote(key),
 		accessTokenScript,
 		strconv.Quote(apiServer), strconv.Quote(idServer), strconv.Quote(relayServer), strconv.Quote(key),
-		magicQueryonline, global.Config.Rustdesk.WsHost)
+		magicQueryonline, strconv.Quote(global.Config.Rustdesk.WsHost))
 
 	c.Header("Content-Type", "application/javascript")
 	c.String(200, tmp)

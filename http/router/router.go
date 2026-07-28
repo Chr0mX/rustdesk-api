@@ -18,11 +18,24 @@ func WebInit(g *gin.Engine) {
 		// recognized on the follow-up GET of /webclient-config/index.js.
 		wcAuth := middleware.WebclientAuth()
 
-		g.GET("/webclient-config/index.js", wcAuth, i.ConfigJs)
-		// Linked from the "Logout" button ConfigJs injects into the
+		// /webclient/?token=<access_token> carries a real, long-lived api
+		// token in the URL - without this, that token would land in the
+		// Referer header of any outbound request/subresource the page ever
+		// makes, in addition to browser history and access logs.
+		noReferrer := func(c *gin.Context) {
+			c.Header("Referrer-Policy", "no-referrer")
+			c.Next()
+		}
+
+		g.GET("/webclient-config/index.js", noReferrer, wcAuth, i.ConfigJs)
+		// POST, not GET: it has a real side effect (session + token
+		// revocation) and needs no prior auth (it must work for an already-
+		// expired session too), so a plain GET would let a cross-site
+		// <img src="/webclient-logout"> force-logout any visitor. Triggered
+		// via fetch() by the "Logout" button ConfigJs injects into the
 		// authenticated webclient page - not nested under /webclient/ since
 		// that'd conflict with its *filepath wildcard below.
-		g.GET("/webclient-logout", i.WebclientLogout)
+		g.POST("/webclient-logout", noReferrer, i.WebclientLogout)
 
 		// Unauthenticated visitors get web.Index.WebclientLogin instead of
 		// the bundled webclient - any enabled account can sign in there
@@ -37,7 +50,7 @@ func WebInit(g *gin.Engine) {
 		}
 
 		wc := g.Group("/webclient")
-		wc.Use(wcAuth, requireWebclientAuth)
+		wc.Use(noReferrer, wcAuth, requireWebclientAuth)
 		wc.StaticFS("/", http.Dir(global.Config.Gin.ResourcesPath+"/web"))
 	}
 	g.StaticFS("/_admin", http.Dir(global.Config.Gin.ResourcesPath+"/admin"))

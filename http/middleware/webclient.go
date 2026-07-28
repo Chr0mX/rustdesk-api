@@ -17,6 +17,18 @@ const webclientSessionCookie = "wc_sess"
 const webclientSessionCachePrefix = "webclient_session:"
 const webclientSessionTTL = 6 * 3600 // 6h, in seconds (matches cache.Handler.Set's exp unit)
 
+// webclientSessionData is what's actually stored server-side for a wc_sess
+// cookie. Keeping ShareToken (not just the resolved fact that it was once
+// valid) lets the cookie fast-path in WebclientAuth re-check the share
+// record on every request, the same way it re-checks CheckUserEnable for
+// token-based sessions - otherwise a session minted before a user got
+// disabled, or before a share record got revoked/expired, would keep
+// working for the rest of its TTL regardless.
+type webclientSessionData struct {
+	Token      string `json:"token"`
+	ShareToken string `json:"share_token,omitempty"`
+}
+
 // WebclientAuth gates access to the real Rustdesk connection config (id/
 // relay/api server + key) that the bundled webclient needs. Without it,
 // anyone who can reach /webclient-config/index.js - no login required -
@@ -43,12 +55,34 @@ func WebclientAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authed := false
 		adminToken := ""
+		shareToken := ""
 
 		if sid, err := c.Cookie(webclientSessionCookie); err == nil && sid != "" {
-			var cachedToken string
-			if err := global.Cache.Get(webclientSessionCachePrefix+sid, &cachedToken); err == nil {
-				authed = true
-				adminToken = cachedToken
+			var sess webclientSessionData
+			if err := global.Cache.Get(webclientSessionCachePrefix+sid, &sess); err == nil {
+				// Re-validate on every request rather than just trusting the
+				// cache entry exists: a token can be revoked, a user
+				// disabled, or a share record deleted/expired at any point
+				// during this session's TTL.
+				switch {
+				case sess.Token != "":
+					user, _ := service.AllService.UserService.InfoByAccessToken(sess.Token)
+					if user.Id != 0 && service.AllService.UserService.CheckUserEnable(user) {
+						authed = true
+						adminToken = sess.Token
+					}
+				case sess.ShareToken != "":
+					sr := service.AllService.ShareRecordService.InfoByShareToken(sess.ShareToken)
+					if sr.Id != 0 {
+						authed = true
+						shareToken = sess.ShareToken
+					}
+				}
+				if !authed {
+					// The cached session no longer checks out - drop it so
+					// it doesn't keep getting silently re-tried.
+					_ = global.Cache.Delete(webclientSessionCachePrefix + sid)
+				}
 			}
 		}
 
@@ -63,16 +97,17 @@ func WebclientAuth() gin.HandlerFunc {
 		}
 
 		if !authed {
-			if shareToken := c.Query("share_token"); shareToken != "" {
-				sr := service.AllService.ShareRecordService.InfoByShareToken(shareToken)
+			if st := c.Query("share_token"); st != "" {
+				sr := service.AllService.ShareRecordService.InfoByShareToken(st)
 				if sr.Id != 0 {
 					authed = true
+					shareToken = st
 				}
 			}
 		}
 
 		if authed {
-			EstablishWebclientSession(c, adminToken)
+			EstablishWebclientSession(c, adminToken, shareToken)
 		}
 
 		c.Set(WebclientAuthedKey, authed)
@@ -81,19 +116,21 @@ func WebclientAuth() gin.HandlerFunc {
 }
 
 // EstablishWebclientSession mints a short-lived opaque session id, stores it
-// server side (global.Cache, alongside adminToken - pass "" if this session
-// isn't tied to an admin api-token, e.g. a share_token-derived one) and
-// drops it in an httpOnly cookie, same as WebclientAuth does on a
-// successful ?token=/?share_token= check. Exported so an
-// already-authenticated admin request (see admin.Config.WebclientSession)
-// can proactively establish the same session - useful when the admin
-// console and webclient are reverse-proxied under different subdomains
-// (see App.WebclientCookieDomain): the admin console can call this right
-// after login so the webclient recognizes the visitor without needing a
-// ?token= in the URL.
-func EstablishWebclientSession(c *gin.Context, adminToken string) {
+// server side (global.Cache, alongside adminToken/shareToken - pass "" for
+// whichever doesn't apply) and drops it in an httpOnly cookie, same as
+// WebclientAuth does on a successful ?token=/?share_token= check. Keeping
+// both on the session lets the cookie fast-path re-validate the underlying
+// user/share record on every request instead of just trusting the cache
+// entry's existence. Exported so an already-authenticated admin request
+// (see admin.Config.WebclientSession) can proactively establish the same
+// session - useful when the admin console and webclient are reverse-proxied
+// under different subdomains (see App.WebclientCookieDomain): the admin
+// console can call this right after login so the webclient recognizes the
+// visitor without needing a ?token= in the URL.
+func EstablishWebclientSession(c *gin.Context, adminToken string, shareToken string) {
 	sid := utils.RandomString(32)
-	_ = global.Cache.Set(webclientSessionCachePrefix+sid, adminToken, webclientSessionTTL)
+	sess := webclientSessionData{Token: adminToken, ShareToken: shareToken}
+	_ = global.Cache.Set(webclientSessionCachePrefix+sid, sess, webclientSessionTTL)
 	secure := c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https"
 	c.SetSameSite(http.SameSiteLaxMode)
 	c.SetCookie(webclientSessionCookie, sid, webclientSessionTTL, "/", global.Config.App.WebclientCookieDomain, secure, true)
@@ -127,8 +164,9 @@ func LookupWebclientSessionToken(c *gin.Context) (token string, ok bool) {
 	if err != nil || sid == "" {
 		return "", false
 	}
-	if err := global.Cache.Get(webclientSessionCachePrefix+sid, &token); err != nil {
+	var sess webclientSessionData
+	if err := global.Cache.Get(webclientSessionCachePrefix+sid, &sess); err != nil {
 		return "", false
 	}
-	return token, true
+	return sess.Token, true
 }

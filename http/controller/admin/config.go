@@ -58,7 +58,7 @@ func (co *Config) ServerConfig(c *gin.Context) {
 func (co *Config) WebclientSession(c *gin.Context) {
 	token, _ := c.Get("token")
 	t, _ := token.(string)
-	middleware.EstablishWebclientSession(c, t)
+	middleware.EstablishWebclientSession(c, t, "")
 	response.Success(c, nil)
 }
 

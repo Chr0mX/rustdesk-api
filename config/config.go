@@ -32,6 +32,15 @@ type App struct {
 	// recognized on the other. Two different, unrelated domains can never
 	// share a cookie this way - that needs an actual SSO handoff.
 	WebclientCookieDomain string `mapstructure:"webclient-cookie-domain"`
+	// WebclientLegacyEnabled/WebclientLegacyPath expose the same compiled
+	// webclient bundle at a second, independent URL slug (see
+	// router.WebInit), so it stays reachable under its own admin-controlled
+	// toggle once /webclient itself is repointed at a future replacement.
+	// Enabled is read live on every request; Path is a routing decision made
+	// once at startup, so changing it needs a restart (same as WebClient
+	// above already does).
+	WebclientLegacyEnabled bool   `mapstructure:"webclient-legacy-enabled"`
+	WebclientLegacyPath    string `mapstructure:"webclient-legacy-path"`
 }
 type Admin struct {
 	Title           string `mapstructure:"title"`

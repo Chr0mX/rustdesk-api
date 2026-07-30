@@ -10,6 +10,8 @@ app:
   web-sso: true #web auth sso
   disable-pwd-login: false #禁用密码登录
   webclient-cookie-domain: "" # e.g. ".example.com" if admin console and webclient are on different subdomains of the same domain; blank = host-only cookie
+  webclient-legacy-enabled: true # serve the compiled webclient bundle at its own slug too (see webclient-legacy-path); toggle live from admin > settings
+  webclient-legacy-path: "webclient-legacy" # URL slug for the above, e.g. /webclient-legacy/; changing this needs a restart
 
 admin:
   title: "RustDesk API Admin"

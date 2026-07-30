@@ -6,6 +6,7 @@ import (
 	"github.com/lejianwen/rustdesk-api/v2/http/controller/web"
 	"github.com/lejianwen/rustdesk-api/v2/http/middleware"
 	"net/http"
+	"strings"
 )
 
 func WebInit(g *gin.Engine) {
@@ -41,17 +42,49 @@ func WebInit(g *gin.Engine) {
 		// the bundled webclient - any enabled account can sign in there
 		// (not just admins), which then redirects to /webclient/?token=...
 		// and lands back here, now authed.
-		requireWebclientAuth := func(c *gin.Context) {
-			authed, _ := c.Get(middleware.WebclientAuthedKey)
-			if authed != true {
-				i.WebclientLogin(c)
-				c.Abort()
+		requireWebclientAuth := func(loginPage *web.Index) gin.HandlerFunc {
+			return func(c *gin.Context) {
+				authed, _ := c.Get(middleware.WebclientAuthedKey)
+				if authed != true {
+					loginPage.WebclientLogin(c)
+					c.Abort()
+				}
 			}
 		}
 
 		wc := g.Group("/webclient")
-		wc.Use(noReferrer, wcAuth, requireWebclientAuth)
+		wc.Use(noReferrer, wcAuth, requireWebclientAuth(i))
 		wc.StaticFS("/", http.Dir(global.Config.Gin.ResourcesPath+"/web"))
+
+		// Serves the exact same compiled bundle at a second, independent
+		// slug (Phase 0 of docs/WEBCLIENT_V2_REBUILD_PLAN.md), so it stays
+		// reachable - on its own admin-controlled toggle - once /webclient
+		// above gets repointed at a from-source replacement. The slug itself
+		// is fixed at startup (it's a route registration), but whether it's
+		// reachable at all is re-checked on every request, so flipping
+		// app.webclient-legacy-enabled from admin > settings takes effect
+		// immediately, no restart needed.
+		legacyPath := strings.Trim(strings.TrimSpace(global.Config.App.WebclientLegacyPath), "/")
+		if legacyPath == "" || legacyPath == "webclient" {
+			// "webclient" itself would collide with the group registered
+			// just above and panic gin at startup - fall back rather than
+			// let a misconfigured path take the server down.
+			legacyPath = "webclient-legacy"
+		}
+		requireLegacyEnabled := func(c *gin.Context) {
+			if !global.Config.App.WebclientLegacyEnabled {
+				c.AbortWithStatus(http.StatusNotFound)
+				return
+			}
+			c.Next()
+		}
+		// Its own Index instance (not the canonical `i`) so its login page
+		// redirects back to this slug after a successful login instead of
+		// always landing on /webclient/ - see web.Index.RedirectBase.
+		iLegacy := &web.Index{RedirectBase: "/" + legacyPath + "/"}
+		wcLegacy := g.Group("/" + legacyPath)
+		wcLegacy.Use(requireLegacyEnabled, noReferrer, wcAuth, requireWebclientAuth(iLegacy))
+		wcLegacy.StaticFS("/", http.Dir(global.Config.Gin.ResourcesPath+"/web"))
 	}
 	g.StaticFS("/_admin", http.Dir(global.Config.Gin.ResourcesPath+"/admin"))
 }

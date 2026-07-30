@@ -15,3 +15,12 @@ type WebclientConfigForm struct {
 	// WAN-reachable one.
 	WebclientRelayFromApiServer bool `json:"webclient_relay_from_api_server"`
 }
+
+// WebclientLegacyConfigForm controls the legacy (compiled-bundle) webclient's
+// standalone URL slug - see App.WebclientLegacyEnabled/WebclientLegacyPath.
+// WebclientLegacyPath is normalized server-side (leading/trailing slashes
+// trimmed, blank falls back to "webclient-legacy").
+type WebclientLegacyConfigForm struct {
+	WebclientLegacyEnabled bool   `json:"webclient_legacy_enabled"`
+	WebclientLegacyPath    string `json:"webclient_legacy_path"`
+}

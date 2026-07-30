@@ -140,8 +140,50 @@ func (co *Config) UpdateWebclientConfig(c *gin.Context) {
 // @Security token
 func (co *Config) AppConfig(c *gin.Context) {
 	response.Success(c, &gin.H{
-		"web_client": global.Config.App.WebClient,
+		"web_client":               global.Config.App.WebClient,
+		"webclient_legacy_enabled": global.Config.App.WebclientLegacyEnabled,
+		"webclient_legacy_path":    global.Config.App.WebclientLegacyPath,
 	})
+}
+
+// UpdateWebclientLegacyConfig toggles the legacy (compiled-bundle) webclient
+// on/off at its own URL slug (see router.WebInit) and lets the admin change
+// that slug. Enabled is read live on every request to the legacy path, so
+// toggling it takes effect immediately; changing the path itself is a
+// routing decision made once at startup, so it needs a restart to take
+// effect - same as app.web-client already does.
+// @Tags ADMIN
+// @Summary 设置旧版webclient独立入口的开关/路径
+// @Description 设置旧版(已编译)webclient在独立URL下的开关和路径,持久化到配置文件
+// @Accept  json
+// @Produce  json
+// @Param body body admin.WebclientLegacyConfigForm true "旧版webclient配置"
+// @Success 200 {object} response.Response
+// @Failure 500 {object} response.Response
+// @Router /admin/config/webclient-legacy [post]
+// @Security token
+func (co *Config) UpdateWebclientLegacyConfig(c *gin.Context) {
+	f := &admin.WebclientLegacyConfigForm{}
+	if err := c.ShouldBindJSON(f); err != nil {
+		response.Fail(c, 101, response.TranslateMsg(c, "ParamsError")+err.Error())
+		return
+	}
+
+	path := strings.Trim(strings.TrimSpace(f.WebclientLegacyPath), "/")
+	if path == "" {
+		path = "webclient-legacy"
+	}
+
+	global.Config.App.WebclientLegacyEnabled = f.WebclientLegacyEnabled
+	global.Config.App.WebclientLegacyPath = path
+	global.Viper.Set("app.webclient-legacy-enabled", f.WebclientLegacyEnabled)
+	global.Viper.Set("app.webclient-legacy-path", path)
+	if err := global.Viper.WriteConfig(); err != nil {
+		response.Fail(c, 101, response.TranslateMsg(c, "OperationFailed")+err.Error())
+		return
+	}
+
+	response.Success(c, nil)
 }
 
 // AdminConfig ADMIN服务配置

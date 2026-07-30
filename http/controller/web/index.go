@@ -9,9 +9,39 @@ import (
 	apiResp "github.com/lejianwen/rustdesk-api/v2/http/response/api"
 	"github.com/lejianwen/rustdesk-api/v2/service"
 	"strconv"
+	"strings"
 )
 
 type Index struct {
+	// RedirectBase is the mount path this Index instance's webclient login
+	// page (WebclientLogin) and logout handler (WebclientLogout) redirect
+	// to. Lets multiple mount points (see router.WebInit's canonical
+	// /webclient and Phase 0's legacy slug) each send visitors back to
+	// themselves instead of always landing on the canonical path. Defaults
+	// to "/webclient/" for the zero value, so existing callers that build
+	// Index{} don't need to change.
+	//
+	// Note: this only covers the *login page* redirect. ConfigJs's injected
+	// "Logout" button and WebclientLogout's own post-logout redirect are
+	// reached via the single shared /webclient-config/index.js and
+	// /webclient-logout routes (baked into the compiled bundle's index.html
+	// as absolute paths - see resources/web/PATCHES.md), which have no
+	// reliable way to tell which mount the request came from (Referer is
+	// deliberately stripped, see router.go's noReferrer). Those two always
+	// redirect to the canonical /webclient/ regardless of which mount is in
+	// use. Harmless today (every mount serves byte-identical content), but
+	// worth revisiting at Phase 6 (Cutover) of
+	// docs/WEBCLIENT_V2_REBUILD_PLAN.md, once /webclient stops being the
+	// same bundle as the legacy slug.
+	RedirectBase string
+}
+
+// redirectBase returns RedirectBase, defaulting to the canonical mount.
+func (i *Index) redirectBase() string {
+	if i.RedirectBase == "" {
+		return "/webclient/"
+	}
+	return i.RedirectBase
 }
 
 // clearConfigScript wipes whatever ConfigJs previously set, for a visitor
@@ -50,7 +80,8 @@ func (i *Index) Index(c *gin.Context) {
 func (i *Index) WebclientLogin(c *gin.Context) {
 	c.Header("Cache-Control", "no-store, must-revalidate")
 	c.Header("Content-Type", "text/html; charset=utf-8")
-	c.String(200, webclientLoginPage)
+	page := strings.Replace(webclientLoginPage, "__WC_REDIRECT_BASE__", i.redirectBase(), 1)
+	c.String(200, page)
 }
 
 const webclientLoginPage = `<!DOCTYPE html>
@@ -153,7 +184,7 @@ document.getElementById('f').addEventListener('submit', async function (e) {
     });
     var data = await res.json();
     if (res.ok && data.access_token) {
-      window.location.href = '/webclient/?token=' + encodeURIComponent(data.access_token) + window.location.hash;
+      window.location.href = '__WC_REDIRECT_BASE__?token=' + encodeURIComponent(data.access_token) + window.location.hash;
     } else {
       errEl.textContent = (data && data.message) || 'Login failed';
       errEl.style.display = 'block';
@@ -185,7 +216,7 @@ func (i *Index) WebclientLogout(c *gin.Context) {
 		}
 	}
 	middleware.RevokeWebclientSession(c)
-	c.Redirect(302, "/webclient/")
+	c.Redirect(302, i.redirectBase())
 }
 
 // ConfigJs seeds the values the bundled webclient (resources/web) reads

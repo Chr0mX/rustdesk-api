@@ -268,6 +268,7 @@ func ConfigBind(rg *gin.RouterGroup) {
 
 	aR.Use(middleware.AdminPrivilege())
 	aR.POST("/webclient", rs.UpdateWebclientConfig)
+	aR.POST("/webclient-legacy", rs.UpdateWebclientLegacyConfig)
 
 }
 

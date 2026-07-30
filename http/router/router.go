@@ -109,4 +109,13 @@ func WebInit(g *gin.Engine) {
 		c.Header("Cache-Control", "no-store")
 		c.File(global.Config.Gin.ResourcesPath + "/admin/webclient.html")
 	})
+
+	// Phase 2's Flutter web engine (Chr0mX/rustdesk, flutter/build/web/
+	// output), served for Engine.vue's VITE_ENGINE_BASE_URL=/webclient-dev/engine/.
+	// Not populated by update.sh - `flutter build web` is still a manual
+	// step (see docs/WEBCLIENT_V2_REBUILD_PLAN.md); the operator copies
+	// build/web's contents into <resources-path>/admin/engine/ by hand.
+	// Same temporary-preview status as the routes above - remove at
+	// Phase 6's cutover.
+	g.StaticFS("/webclient-dev/engine", http.Dir(global.Config.Gin.ResourcesPath+"/admin/engine"))
 }

@@ -87,4 +87,26 @@ func WebInit(g *gin.Engine) {
 		wcLegacy.StaticFS("/", http.Dir(global.Config.Gin.ResourcesPath+"/web"))
 	}
 	g.StaticFS("/_admin", http.Dir(global.Config.Gin.ResourcesPath+"/admin"))
+
+	// Dev-only preview of the new Vue webclient shell (Phase 4 of
+	// docs/WEBCLIENT_V2_REBUILD_PLAN.md, rustdesk-api-web), ahead of Phase 6
+	// (Cutover) actually repointing /webclient at it. rustdesk-api-web's
+	// vite.config.js builds webclient.html as a second entry alongside
+	// _admin's own index.html into the same dist/ output, which
+	// Rustdesk-Server-Installer's update.sh already copies wholesale into
+	// resources/admin - so webclient.html and its static/ assets are
+	// already sitting right next to _admin's own, just not routed to
+	// anywhere. This mounts them at their own slug without touching
+	// /webclient/ or /_admin/ at all. No admin toggle (unlike Phase 0's
+	// legacy-webclient slug) - this is a temporary convenience for
+	// following the rebuild along, not a real deployment target; remove
+	// once Phase 6 makes it moot.
+	g.StaticFS("/webclient-dev/static", http.Dir(global.Config.Gin.ResourcesPath+"/admin/static"))
+	g.GET("/webclient-dev", func(c *gin.Context) {
+		c.Redirect(http.StatusFound, "/webclient-dev/")
+	})
+	g.GET("/webclient-dev/", func(c *gin.Context) {
+		c.Header("Cache-Control", "no-store")
+		c.File(global.Config.Gin.ResourcesPath + "/admin/webclient.html")
+	})
 }

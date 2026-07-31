@@ -13,8 +13,28 @@
 
     This is a placeholder for base href that will be replaced by the value of
     the `--base-href` argument provided to `flutter build`.
+
+    A static href here would be wrong now that Phase 0/Phase 6 of docs/
+    WEBCLIENT_V2_REBUILD_PLAN.md moved this bundle off the canonical
+    /webclient/ path onto its own admin-configurable slug
+    (App.WebclientLegacyPath, "webclient-legacy" by default, but an admin
+    can set it to anything - see router.go's WebInit) - a hardcoded
+    "/webclient/" here 404s every relative asset (js/dist/index.js,
+    favicon.svg, manifest.json, libs/stream/*.js) once actually served from
+    that different path, confirmed live. gin's StaticFS serves this file
+    verbatim with no templating, so the actual slug can't be baked in at
+    build/deploy time either - derive it from the real request path
+    instead, which is correct regardless of what that slug is configured
+    as. document.write() is safe here specifically because this script is
+    part of the initial synchronous HTML parse (a literal <script> in the
+    served document, not something injected later via a dynamically
+    appended <script> tag) - the failure mode that makes document.write
+    generally unsafe (a no-op or a wiped document) only applies to the
+    latter.
   -->
-    <base href="/webclient/" />
+    <script>
+      document.write('<base href="' + (location.pathname.match(/^\/[^/]+\//) || ['/webclient-legacy/'])[0] + '" />')
+    </script>
 
     <meta charset="UTF-8" />
     <meta content="IE=Edge" http-equiv="X-UA-Compatible" />

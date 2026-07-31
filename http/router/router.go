@@ -34,14 +34,19 @@ func WebInit(g *gin.Engine) {
 		// expired session too), so a plain GET would let a cross-site
 		// <img src="/webclient-logout"> force-logout any visitor. Triggered
 		// via fetch() by the "Logout" button ConfigJs injects into the
-		// authenticated webclient page - not nested under /webclient/ since
-		// that'd conflict with its *filepath wildcard below.
+		// authenticated legacy webclient page - not nested under a
+		// webclient path since that'd conflict with its *filepath
+		// wildcard.
 		g.POST("/webclient-logout", noReferrer, i.WebclientLogout)
 
 		// Unauthenticated visitors get web.Index.WebclientLogin instead of
-		// the bundled webclient - any enabled account can sign in there
-		// (not just admins), which then redirects to /webclient/?token=...
-		// and lands back here, now authed.
+		// the bundled legacy webclient - any enabled account can sign in
+		// there (not just admins), which then redirects back to this same
+		// slug's ?token=... and lands back here, now authed. Only the
+		// legacy bundle uses this: the from-source Vue webclient below has
+		// its own client-side login page/router guard instead, so it isn't
+		// gated server-side at all - unauthenticated visitors just get the
+		// app shell, which shows its own Login.vue.
 		requireWebclientAuth := func(loginPage *web.Index) gin.HandlerFunc {
 			return func(c *gin.Context) {
 				authed, _ := c.Get(middleware.WebclientAuthedKey)
@@ -52,23 +57,22 @@ func WebInit(g *gin.Engine) {
 			}
 		}
 
-		wc := g.Group("/webclient")
-		wc.Use(noReferrer, wcAuth, requireWebclientAuth(i))
-		wc.StaticFS("/", http.Dir(global.Config.Gin.ResourcesPath+"/web"))
-
-		// Serves the exact same compiled bundle at a second, independent
-		// slug (Phase 0 of docs/WEBCLIENT_V2_REBUILD_PLAN.md), so it stays
-		// reachable - on its own admin-controlled toggle - once /webclient
-		// above gets repointed at a from-source replacement. The slug itself
-		// is fixed at startup (it's a route registration), but whether it's
+		// The legacy (pre-Phase-4) bundled webclient, kept reachable at
+		// its own admin-toggleable slug (Phase 0 of docs/
+		// WEBCLIENT_V2_REBUILD_PLAN.md) now that /webclient/ itself
+		// (below) serves the from-source Vue rebuild instead - not the
+		// primary route anymore, but still fully functional for admins
+		// who haven't cut over yet or want a fallback. The slug itself is
+		// fixed at startup (it's a route registration), but whether it's
 		// reachable at all is re-checked on every request, so flipping
 		// app.webclient-legacy-enabled from admin > settings takes effect
 		// immediately, no restart needed.
 		legacyPath := strings.Trim(strings.TrimSpace(global.Config.App.WebclientLegacyPath), "/")
 		if legacyPath == "" || legacyPath == "webclient" {
-			// "webclient" itself would collide with the group registered
-			// just above and panic gin at startup - fall back rather than
-			// let a misconfigured path take the server down.
+			// "webclient" itself would collide with the Vue webclient
+			// routes registered below and panic gin at startup - fall
+			// back rather than let a misconfigured path take the server
+			// down.
 			legacyPath = "webclient-legacy"
 		}
 		requireLegacyEnabled := func(c *gin.Context) {
@@ -85,37 +89,33 @@ func WebInit(g *gin.Engine) {
 		wcLegacy := g.Group("/" + legacyPath)
 		wcLegacy.Use(requireLegacyEnabled, noReferrer, wcAuth, requireWebclientAuth(iLegacy))
 		wcLegacy.StaticFS("/", http.Dir(global.Config.Gin.ResourcesPath+"/web"))
+
+		// The from-source Vue webclient (Phase 4 of docs/
+		// WEBCLIENT_V2_REBUILD_PLAN.md, rustdesk-api-web) - the primary
+		// /webclient/ route as of Phase 6's cutover, replacing the legacy
+		// bundle above. rustdesk-api-web's vite.config.js builds
+		// webclient.html as a second entry alongside _admin's own
+		// index.html into the same dist/ output, which Rustdesk-Server-
+		// Installer's update.sh already copies wholesale into
+		// resources/admin - so webclient.html and its static/ assets sit
+		// right next to _admin's own. No server-side auth gate on the
+		// page itself (see requireWebclientAuth's comment above) -
+		// /webclient-config/index.js above is still the one gated
+		// endpoint that actually hands out real connection config.
+		g.StaticFS("/webclient/static", http.Dir(global.Config.Gin.ResourcesPath+"/admin/static"))
+		g.GET("/webclient", func(c *gin.Context) {
+			c.Redirect(http.StatusFound, "/webclient/")
+		})
+		g.GET("/webclient/", func(c *gin.Context) {
+			c.Header("Cache-Control", "no-store")
+			c.File(global.Config.Gin.ResourcesPath + "/admin/webclient.html")
+		})
+
+		// Phase 2's Flutter web engine (Chr0mX/rustdesk, flutter/build/web/
+		// output), served for Engine.vue's VITE_ENGINE_BASE_URL=/webclient/engine/.
+		// Rustdesk-Server-Installer's update.sh builds and populates this
+		// automatically (see its build_flutter_engine).
+		g.StaticFS("/webclient/engine", http.Dir(global.Config.Gin.ResourcesPath+"/admin/engine"))
 	}
 	g.StaticFS("/_admin", http.Dir(global.Config.Gin.ResourcesPath+"/admin"))
-
-	// Dev-only preview of the new Vue webclient shell (Phase 4 of
-	// docs/WEBCLIENT_V2_REBUILD_PLAN.md, rustdesk-api-web), ahead of Phase 6
-	// (Cutover) actually repointing /webclient at it. rustdesk-api-web's
-	// vite.config.js builds webclient.html as a second entry alongside
-	// _admin's own index.html into the same dist/ output, which
-	// Rustdesk-Server-Installer's update.sh already copies wholesale into
-	// resources/admin - so webclient.html and its static/ assets are
-	// already sitting right next to _admin's own, just not routed to
-	// anywhere. This mounts them at their own slug without touching
-	// /webclient/ or /_admin/ at all. No admin toggle (unlike Phase 0's
-	// legacy-webclient slug) - this is a temporary convenience for
-	// following the rebuild along, not a real deployment target; remove
-	// once Phase 6 makes it moot.
-	g.StaticFS("/webclient-dev/static", http.Dir(global.Config.Gin.ResourcesPath+"/admin/static"))
-	g.GET("/webclient-dev", func(c *gin.Context) {
-		c.Redirect(http.StatusFound, "/webclient-dev/")
-	})
-	g.GET("/webclient-dev/", func(c *gin.Context) {
-		c.Header("Cache-Control", "no-store")
-		c.File(global.Config.Gin.ResourcesPath + "/admin/webclient.html")
-	})
-
-	// Phase 2's Flutter web engine (Chr0mX/rustdesk, flutter/build/web/
-	// output), served for Engine.vue's VITE_ENGINE_BASE_URL=/webclient-dev/engine/.
-	// Not populated by update.sh - `flutter build web` is still a manual
-	// step (see docs/WEBCLIENT_V2_REBUILD_PLAN.md); the operator copies
-	// build/web's contents into <resources-path>/admin/engine/ by hand.
-	// Same temporary-preview status as the routes above - remove at
-	// Phase 6's cutover.
-	g.StaticFS("/webclient-dev/engine", http.Dir(global.Config.Gin.ResourcesPath+"/admin/engine"))
 }

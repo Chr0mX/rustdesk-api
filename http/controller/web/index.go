@@ -62,8 +62,24 @@ localStorage.removeItem(ws2_prefix+'access_token');
 localStorage.removeItem(ws2_prefix+'user_info');
 `
 
+// Index sends a visitor at "/" to wherever App.RootRedirect points -
+// "/_admin/" by default (blank or "admin"), "/webclient/" if configured,
+// or any other value verbatim (an absolute path or a full external URL) -
+// see App.RootRedirect's own comment for why this isn't just a two-way
+// choice.
 func (i *Index) Index(c *gin.Context) {
-	c.Redirect(302, "/_admin/")
+	c.Redirect(302, rootRedirectTarget())
+}
+
+func rootRedirectTarget() string {
+	switch strings.TrimSpace(global.Config.App.RootRedirect) {
+	case "", "admin":
+		return "/_admin/"
+	case "webclient":
+		return "/webclient/"
+	default:
+		return global.Config.App.RootRedirect
+	}
 }
 
 // WebclientLogin is what unauthenticated visitors to /webclient/* get

@@ -143,6 +143,7 @@ func (co *Config) AppConfig(c *gin.Context) {
 		"web_client":               global.Config.App.WebClient,
 		"webclient_legacy_enabled": global.Config.App.WebclientLegacyEnabled,
 		"webclient_legacy_path":    global.Config.App.WebclientLegacyPath,
+		"root_redirect":            global.Config.App.RootRedirect,
 	})
 }
 
@@ -178,6 +179,37 @@ func (co *Config) UpdateWebclientLegacyConfig(c *gin.Context) {
 	global.Config.App.WebclientLegacyPath = path
 	global.Viper.Set("app.webclient-legacy-enabled", f.WebclientLegacyEnabled)
 	global.Viper.Set("app.webclient-legacy-path", path)
+	if err := global.Viper.WriteConfig(); err != nil {
+		response.Fail(c, 101, response.TranslateMsg(c, "OperationFailed")+err.Error())
+		return
+	}
+
+	response.Success(c, nil)
+}
+
+// UpdateRootRedirectConfig sets where "/" sends visitors (web.Index.Index).
+// Read live on every request, same as WebclientLegacyEnabled above - no
+// restart needed for this to take effect.
+// @Tags ADMIN
+// @Summary 设置根路径"/"的跳转目标
+// @Description 设置访问网站根路径时跳转到的位置(admin/webclient/自定义地址),持久化到配置文件
+// @Accept  json
+// @Produce  json
+// @Param body body admin.RootRedirectConfigForm true "根路径跳转配置"
+// @Success 200 {object} response.Response
+// @Failure 500 {object} response.Response
+// @Router /admin/config/root-redirect [post]
+// @Security token
+func (co *Config) UpdateRootRedirectConfig(c *gin.Context) {
+	f := &admin.RootRedirectConfigForm{}
+	if err := c.ShouldBindJSON(f); err != nil {
+		response.Fail(c, 101, response.TranslateMsg(c, "ParamsError")+err.Error())
+		return
+	}
+
+	target := strings.TrimSpace(f.RootRedirect)
+	global.Config.App.RootRedirect = target
+	global.Viper.Set("app.root-redirect", target)
 	if err := global.Viper.WriteConfig(); err != nil {
 		response.Fail(c, 101, response.TranslateMsg(c, "OperationFailed")+err.Error())
 		return

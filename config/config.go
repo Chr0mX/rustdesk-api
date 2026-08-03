@@ -41,6 +41,15 @@ type App struct {
 	// above already does).
 	WebclientLegacyEnabled bool   `mapstructure:"webclient-legacy-enabled"`
 	WebclientLegacyPath    string `mapstructure:"webclient-legacy-path"`
+	// RootRedirect controls where web.Index.Index sends a visitor to "/".
+	// Blank (the zero value, so existing config.yaml files without this
+	// key keep today's behavior unchanged) and the literal "admin" both
+	// mean "/_admin/" - "webclient" means "/webclient/" - anything else
+	// is used verbatim as the redirect target (an absolute path like
+	// "/webclient-legacy/", or a full external URL), letting an admin
+	// point the bare domain anywhere without needing a reverse-proxy
+	// rule just for this.
+	RootRedirect string `mapstructure:"root-redirect"`
 }
 type Admin struct {
 	Title           string `mapstructure:"title"`

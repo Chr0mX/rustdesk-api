@@ -24,3 +24,9 @@ type WebclientLegacyConfigForm struct {
 	WebclientLegacyEnabled bool   `json:"webclient_legacy_enabled"`
 	WebclientLegacyPath    string `json:"webclient_legacy_path"`
 }
+
+// RootRedirectConfigForm sets where "/" sends visitors - see
+// App.RootRedirect's own comment for the accepted values.
+type RootRedirectConfigForm struct {
+	RootRedirect string `json:"root_redirect"`
+}
